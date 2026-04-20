@@ -187,3 +187,4 @@ cd packages/frontend && pnpm add -D <package>  # dev dep
 | [MkDocs Material](https://squidfunk.github.io/mkdocs-material/) | Documentation | `mkdocs.yml` |
 | [pre-commit](https://pre-commit.com/) | Git hooks | `.pre-commit-config.yaml` |
 | [GitHub Actions](https://github.com/features/actions) | CI | `.github/workflows/tests.yml` |
+ 
