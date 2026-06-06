@@ -15,9 +15,9 @@ analytics, heatmaps, and ML predictions.
 ┌─────────────────────────────────────────────┐
 │  Stage 1 — Computer Vision pipeline         │
 │                                             │
-│  1. Detect players + ball  (YOLO11)         │
-│  2. Track identities       (ByteTrack)      │
-│  3. Estimate body pose     (YOLO11-pose)    │
+│  1. Detect players + ball  (YOLO26)         │
+│  2. Track identities       (BoT-SORT)       │
+│  3. Estimate body pose     (YOLO26-pose)    │
 │  4. Classify team          (K-Means HSV)    │
 │  5. Map to court coords    (homography)     │
 └──────────────────┬──────────────────────────┘
@@ -41,8 +41,8 @@ All runtime data lives under `data/` at the repo root. This directory is not com
 data/
 ├── matches.duckdb          ← single DuckDB file, all matches
 ├── models/
-│   ├── yolo11m.pt          ← downloaded automatically on first run
-│   ├── yolo11m-pose.pt     ← downloaded automatically on first run
+│   ├── yolo26m.pt          ← downloaded automatically on first run
+│   ├── yolo26m-pose.pt     ← downloaded automatically on first run
 │   └── action_best.pt      ← produced by wels-train
 └── videos/                 ← recommended location for match recordings
     └── 2026-04-13_wels_vs_linz.mp4

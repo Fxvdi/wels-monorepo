@@ -43,18 +43,19 @@ FrameState(frame_id, timestamp_s, players, ball)
 
 **Output:** `(list[Detection], Detection | None)` — player detections + ball detection
 
-The detector runs YOLO11 on each frame with two targets:
+The detector runs YOLO26 on each frame with two targets:
 - **Person class** → player bounding boxes
 - **Sports ball class** → ball bounding box (highest-confidence result only)
 
-[ByteTrack](https://github.com/ifzhang/ByteTrack) (built into ultralytics) assigns
+[BoT-SORT](https://github.com/NirAharon/BoT-SORT) (built into ultralytics) assigns
 a stable `track_id` to each player across frames. The same player keeps the same ID
-even if they temporarily leave the frame.
+even if they temporarily leave the frame. ReID via `osnet_x0_25_market.pt` further
+stabilises identities across longer occlusions.
 
 ```
 frame (1280×720 BGR)
     │
-    │  YOLO11 inference
+    │  YOLO26 inference
     ▼
 raw detections + track IDs
     │
@@ -71,7 +72,7 @@ list[Detection]  +  Detection | None (ball)
 
 **Output:** `list[list[Keypoint] | None]` — one entry per detection, `None` if no pose matched
 
-YOLO11-pose runs a single GPU forward pass per frame (all players at once).
+YOLO26-pose runs a single GPU forward pass per frame (all players at once).
 Results are matched back to player detections by center-point distance.
 Each pose contains 17 COCO keypoints:
 

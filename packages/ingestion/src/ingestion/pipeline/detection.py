@@ -1,8 +1,8 @@
 """
-Player and ball detector — YOLO11 + ByteTrack.
+Player and ball detector — YOLO26 + Botsort.
 
 Ported from tracking_pipeline.py:
-  - Per-frame tracking via model.track(persist=True), which keeps ByteTrack
+  - Per-frame tracking via model.track(persist=True), which keeps Botsort
     state alive across calls (equivalent to stream=True over the full video).
   - CLASS_NAMES {0: goalkeeper, 1: player, 2: referee} — custom handball model.
   - Ghost-track cleanup happens as a post-processing step in the orchestrator
@@ -22,7 +22,7 @@ _PLAYER_CLASS_IDS = {0, 1, 2}  # goalkeeper, player, referee
 
 
 class Detector:
-    """YOLO11 + ByteTrack player and ball detector."""
+    """YOLO26 + Botsort player and ball detector."""
 
     def __init__(
         self,
@@ -47,7 +47,7 @@ class Detector:
 
     def detect(self, frame: np.ndarray) -> tuple[list[Detection], Detection | None]:
         """
-        Run detection + ByteTrack on one frame.
+        Run detection + Botsort on one frame.
 
         Returns:
             players: tracked player detections (track_id stable across frames)
@@ -55,7 +55,7 @@ class Detector:
         """
         results = self._model.track(
             frame,
-            persist=True,  # keeps ByteTrack state alive between calls
+            persist=True,  # keeps BoT-SORT state alive between calls
             conf=self._conf,
             device=self._device,
             tracker=self._tracker,

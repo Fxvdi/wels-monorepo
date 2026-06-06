@@ -22,7 +22,7 @@ A monorepo for a handball analytics platform that helps trainers analyze matches
 | Templating | Jinja2 + HTMX |
 | Data models | Pydantic v2 |
 | Package manager | uv |
-| Object detection | YOLO11 (ultralytics) + ByteTrack |
+| Object detection | YOLO26 (ultralytics) + BoT-SORT |
 | ML framework | PyTorch + PyTorch Geometric |
 | Storage | DuckDB |
 | Linter / formatter | ruff |

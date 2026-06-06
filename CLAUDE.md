@@ -105,7 +105,7 @@ wels-monorepo/
 | Config | pydantic-settings (`WELS_` prefix) |
 | HTTP client (Python) | httpx (async) |
 | Storage | **DuckDB** (`data/matches.duckdb`) |
-| Object detection | **YOLO11** (ultralytics) + ByteTrack |
+| Object detection | **YOLO26** (ultralytics) + BoT-SORT |
 | ML framework | **PyTorch** + **PyTorch Geometric** |
 | Python package manager | **uv** (not pip, not Poetry) |
 | Node package manager | **pnpm** (installed by moon's node toolchain) |

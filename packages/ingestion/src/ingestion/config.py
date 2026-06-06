@@ -2,6 +2,9 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
+# Absolute path to the custom tracker config bundled with this package
+_TRACKER_DEFAULT = Path(__file__).parent.parent.parent / "botsort_custom.yaml"
+
 
 class IngestionSettings(BaseSettings):
     model_config = {"env_prefix": "WELS_"}
@@ -34,8 +37,8 @@ class IngestionSettings(BaseSettings):
     # Ghost-track cleanup: tracks seen in fewer than this many frames are removed
     ghost_threshold: int = 10
 
-    # Tracker config passed to ultralytics — path relative to repo root or absolute
-    tracker_config: Path = Path("packages/ingestion/botsort_custom.yaml")
+    # Tracker config passed to ultralytics (absolute path or built-in name like bytetrack.yaml)
+    tracker_config: Path = _TRACKER_DEFAULT
 
 
 settings = IngestionSettings()
