@@ -11,6 +11,8 @@ Ported from tracking_pipeline.py:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from ingestion.types import BoundingBox, Detection
@@ -30,7 +32,7 @@ class Detector:
         ball_confidence: float,
         max_persons: int,
         device: str,
-        tracker: str = "bytetrack.yaml",
+        tracker: str | Path = "bytetrack.yaml",
     ) -> None:
         # Lazy import — ultralytics is an optional [cv] dep, not installed in CI
         from ultralytics import YOLO  # type: ignore[import-unresolved]
@@ -41,7 +43,7 @@ class Detector:
         self._ball_conf = ball_confidence
         self._max_persons = max_persons
         self._device = device
-        self._tracker = tracker
+        self._tracker = str(tracker)  # ultralytics expects a str
 
     def detect(self, frame: np.ndarray) -> tuple[list[Detection], Detection | None]:
         """

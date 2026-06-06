@@ -34,8 +34,8 @@ class IngestionSettings(BaseSettings):
     # Ghost-track cleanup: tracks seen in fewer than this many frames are removed
     ghost_threshold: int = 10
 
-    # Tracker config passed to ultralytics (yaml filename or path)
-    tracker_config: str = "bytetrack.yaml"
+    # Tracker config passed to ultralytics — path relative to repo root or absolute
+    tracker_config: Path = Path("packages/ingestion/botsort_custom.yaml")
 
 
 settings = IngestionSettings()
