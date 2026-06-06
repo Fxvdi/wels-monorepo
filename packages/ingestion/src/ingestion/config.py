@@ -31,5 +31,11 @@ class IngestionSettings(BaseSettings):
     # How many frames to accumulate before fitting the team classifier
     team_warmup_frames: int = 150
 
+    # Ghost-track cleanup: tracks seen in fewer than this many frames are removed
+    ghost_threshold: int = 10
+
+    # Tracker config passed to ultralytics (yaml filename or path)
+    tracker_config: str = "bytetrack.yaml"
+
 
 settings = IngestionSettings()

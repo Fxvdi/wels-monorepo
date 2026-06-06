@@ -42,6 +42,7 @@ class IngestionOrchestrator:
             ball_confidence=settings.ball_confidence,
             max_persons=settings.max_persons,
             device=settings.device,
+            tracker=settings.tracker_config,
         )
 
         self._pose: PoseEstimator | None = None
@@ -103,7 +104,17 @@ class IngestionOrchestrator:
                 if vf.frame_id % 500 == 0:
                     logger.info("  frame %d / %d", vf.frame_id, vf.total_frames)
 
-        logger.info("Phase 3: post-processing (velocities + ball carrier)")
+        logger.info("Phase 3: ghost track cleanup (min %d frames)", settings.ghost_threshold)
+        removed = _remove_ghost_tracks(conn, match_id, settings.ghost_threshold)
+        conn.commit()
+        logger.info("  removed %d ghost track(s)", removed)
+
+        logger.info("Phase 4: track interpolation (fill gaps within each track's lifespan)")
+        added = _interpolate_tracks(conn, match_id)
+        conn.commit()
+        logger.info("  interpolated %d frame(s)", added)
+
+        logger.info("Phase 5: post-processing (velocities + ball carrier)")
         _compute_velocities(conn, match_id, meta.fps)
         _mark_ball_carrier(conn, match_id)
         conn.commit()
@@ -195,6 +206,164 @@ def _compute_velocities(conn: object, match_id: str, fps: float) -> None:
         """,
         [fps, fps, match_id],
     )
+
+
+def _interpolate_tracks(conn: object, match_id: str) -> int:
+    """
+    Linearly interpolate missing frames within each track's lifespan.
+
+    Mirrors tracking_pipeline.interpolate_tracks(): for each track, fills in
+    frames between its first and last detection using numpy.interp.
+    Inserts new rows into `players`; velocity/has_ball are left at defaults
+    and recomputed in Phase 5.
+    """
+    import duckdb as _duckdb
+    import numpy as np
+
+    assert isinstance(conn, _duckdb.DuckDBPyConnection)
+
+    rows = conn.execute(
+        """
+        SELECT track_id, frame_id, team, on_court,
+               bbox_x1, bbox_y1, bbox_x2, bbox_y2,
+               pixel_foot_x, pixel_foot_y, confidence,
+               court_x, court_y
+        FROM players
+        WHERE match_id = ?
+        ORDER BY track_id, frame_id
+        """,
+        [match_id],
+    ).fetchall()
+
+    if not rows:
+        return 0
+
+    # Group rows by track_id (already ordered)
+    tracks: dict[int, list[tuple[object, ...]]] = {}
+    for row in rows:
+        tid = int(row[0])
+        tracks.setdefault(tid, []).append(row)
+
+    new_rows: list[tuple[object, ...]] = []
+
+    for tid, track_rows in tracks.items():
+        frame_ids = np.array([r[1] for r in track_rows], dtype=np.int64)
+        if frame_ids[0] == frame_ids[-1]:
+            continue  # single frame, nothing to fill
+
+        full_range = np.arange(frame_ids[0], frame_ids[-1] + 1, dtype=np.int64)
+        missing = np.setdiff1d(full_range, frame_ids)
+        if missing.size == 0:
+            continue
+
+        # Numeric columns — interpolate linearly
+        num_keys = [
+            "bbox_x1",
+            "bbox_y1",
+            "bbox_x2",
+            "bbox_y2",
+            "pixel_foot_x",
+            "pixel_foot_y",
+            "confidence",
+        ]
+        num_vals = {
+            k: np.array([r[i + 4] for r in track_rows], dtype=np.float64)
+            for i, k in enumerate(num_keys)
+        }
+
+        # Court coords — interpolate only where values are known
+        raw_cx = np.array([r[11] if r[11] is not None else np.nan for r in track_rows])
+        raw_cy = np.array([r[12] if r[12] is not None else np.nan for r in track_rows])
+        has_court = not np.all(np.isnan(raw_cx))
+        if has_court:
+            known = ~np.isnan(raw_cx)
+            known_fids = frame_ids[known]
+            known_cx = raw_cx[known]
+            known_cy = raw_cy[known]
+
+        for mf in missing.tolist():
+            interp = {k: float(np.interp(mf, frame_ids, num_vals[k])) for k in num_keys}
+
+            court_x: float | None = None
+            court_y: float | None = None
+            if has_court and known_fids[0] <= mf <= known_fids[-1]:
+                court_x = float(np.interp(mf, known_fids, known_cx))
+                court_y = float(np.interp(mf, known_fids, known_cy))
+
+            # Forward-fill team and on_court from the last known frame before mf
+            team = track_rows[0][2]
+            on_court = track_rows[0][3]
+            for r in track_rows:
+                if r[1] <= mf:
+                    team = r[2]
+                    on_court = r[3]
+                else:
+                    break
+
+            new_rows.append(
+                (
+                    match_id,
+                    int(mf),
+                    tid,
+                    team,
+                    bool(on_court),
+                    round(interp["bbox_x1"]),
+                    round(interp["bbox_y1"]),
+                    round(interp["bbox_x2"]),
+                    round(interp["bbox_y2"]),
+                    interp["pixel_foot_x"],
+                    interp["pixel_foot_y"],
+                    interp["confidence"],
+                    court_x,
+                    court_y,
+                )
+            )
+
+    for row in new_rows:
+        conn.execute(
+            """
+            INSERT INTO players
+                (match_id, frame_id, track_id, team, on_court,
+                 bbox_x1, bbox_y1, bbox_x2, bbox_y2,
+                 pixel_foot_x, pixel_foot_y, confidence,
+                 court_x, court_y)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            list(row),
+        )
+
+    return len(new_rows)
+
+
+def _remove_ghost_tracks(conn: object, match_id: str, min_frames: int) -> int:
+    """Delete player rows whose track appeared in fewer than min_frames distinct frames."""
+    import duckdb as _duckdb
+
+    assert isinstance(conn, _duckdb.DuckDBPyConnection)
+
+    ghost_ids: list[int] = [
+        row[0]
+        for row in conn.execute(
+            """
+            SELECT track_id
+            FROM players
+            WHERE match_id = ?
+            GROUP BY track_id
+            HAVING COUNT(DISTINCT frame_id) < ?
+            """,
+            [match_id, min_frames],
+        ).fetchall()
+    ]
+
+    if not ghost_ids:
+        return 0
+
+    placeholders = ", ".join("?" * len(ghost_ids))
+    conn.execute(
+        f"DELETE FROM players WHERE match_id = ? AND track_id IN ({placeholders})",
+        [match_id, *ghost_ids],
+    )
+    return len(ghost_ids)
 
 
 def _mark_ball_carrier(conn: object, match_id: str) -> None:

@@ -48,6 +48,9 @@ site/
 data/*.duckdb
 data/models/
 
+# TypeScript build cache
+*.tsbuildinfo
+
 # other
 .stfolder
 .stignore
